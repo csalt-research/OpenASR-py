@@ -2,6 +2,9 @@
 *.pyc
 __pycache__
 *.pt
+*.mp3
+runs/
+saved/
 
 # Ignore user-generated exp directories
 exp
