@@ -13,14 +13,14 @@
 CUDA_VISIBLE_DEVICES=2 python train.py -model_type audio \
  	-rnn_type LSTM \
  	-encoder_type brnn \
- 	-enc_rnn_size 1024 \
+ 	-enc_rnn_size 512 \
  	-enc_layers 4 \
  	-audio_enc_pooling 2 \
  	-dec_rnn_size 512 \
  	-dec_layers 1 \
  	-dropout 0.5 \
  	-data data/common-voice/shards/us-v3/sentencepiece-level \
- 	-save_model saved/v3_sp_drop_5_pool_2_bi_enc_1024/model \
+ 	-save_model saved/v3_sp_drop_5_pool_2_bi_enc_512/model \
  	-global_attention mlp \
  	-batch_size 32 \
  	-optim adam \
@@ -32,6 +32,6 @@ CUDA_VISIBLE_DEVICES=2 python train.py -model_type audio \
  	-save_checkpoint_steps 2000 \
  	-keep_checkpoint 3 \
  	-tensorboard \
- 	-tensorboard_log_dir runs/v3_sp_drop_5_pool_2_bi_enc_1024 \
+ 	-tensorboard_log_dir runs/v3_sp_drop_5_pool_2_bi_enc_512 \
  	-gpu_ranks 0 \
 	-sample_rate 48000
