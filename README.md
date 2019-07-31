@@ -23,6 +23,8 @@ sudo apt-get install -y sox libsox-dev libsox-fmt-all
 pip install git+https://github.com/pytorch/audio@d92de5b
 # install sentencepiece
 pip install sentencepiece
+# install library for error rate computation
+pip install python-levenshtein
 ```
 
 ## Data preparation
