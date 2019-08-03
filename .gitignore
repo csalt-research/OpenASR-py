@@ -6,6 +6,7 @@ __pycache__
 runs/
 out/
 saved/
+logs/
 
 # Ignore user-generated exp directories
 exp
