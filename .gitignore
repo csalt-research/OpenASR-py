@@ -5,6 +5,7 @@ __pycache__
 *.mp3
 runs/
 saved/
+logs/
 
 # Ignore user-generated exp directories
 exp
