@@ -22,7 +22,7 @@ CUDA_VISIBLE_DEVICES=2 python train.py -model_type audio \
  	-data data/common-voice/shards/us-v3/sentencepiece-level \
  	-save_model saved/v3_sp_drop_5_pool_2_bi_enc_512/model \
  	-global_attention mlp \
- 	-batch_size 32 \
+ 	-batch_size 64 \
  	-optim adam \
  	-max_grad_norm 100 \
  	-learning_rate 0.0003 \

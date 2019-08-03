@@ -16,7 +16,7 @@ if __name__ == '__main__':
     parser.add_argument('--tgt', 
         type=str, help='Target predictions', required=True)
     parser.add_argument('--token', 
-        type=str, help='Granularity of predictions', required=True, choices=['word', 'char'])
+        type=str, help='Granularity of predictions', required=True, choices=['word', 'char', 'sp'])
     args = parser.parse_args()
 
     assert os.path.exists(args.pred)
@@ -52,6 +52,19 @@ if __name__ == '__main__':
             # WER
             w_x = ''.join(x).split('_')
             w_y = ''.join(y).split('_')
+            d = edit_distance(w_x, w_y)
+            wer += d
+            n_w += len(w_y)
+        print('WER: %.2f CER: %.2f' % (100*wer/n_w, 100*cer/n_c))
+    elif args.token == 'sp':
+        for x, y in zip(l1, l2):
+            # CER
+            d = edit_distance(list(''.join(x).replace('▁', ' ').strip()), list(''.join(y).replace('▁', ' ').strip()))
+            cer += d
+            n_c += len(' '.join(''.join(y).replace('▁', ' ').split()))
+            # WER
+            w_x = ''.join(x).replace('▁', ' ').split()
+            w_y = ''.join(y).replace('▁', ' ').split()
             d = edit_distance(w_x, w_y)
             wer += d
             n_w += len(w_y)
