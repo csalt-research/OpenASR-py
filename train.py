@@ -1,200 +1,211 @@
-#!/usr/bin/env python
-"""Train models."""
-import os
-import signal
+import os, time
 import torch
+from torch.nn.init import xavier_uniform_
+from configargparse import ArgumentParser
 
-import onmt.opts as opts
-import onmt.utils.distributed
+from data.dataloaders import ShardedDataLoader
 
-from onmt.utils.misc import set_random_seed
-from onmt.utils.logging import init_logger, logger
-from onmt.train_single import main as single_main
-from onmt.utils.parse import ArgumentParser
-from onmt.inputters.inputter import build_dataset_iter, \
-    load_old_vocab, old_style_vocab, build_dataset_iter_multiple
+from utils.logging import logger
+from utils.opts import build_train_parser
+from utils.loss import ShardedCELoss
+from utils.decode import beam_decode
+from utils.optimizers import Optimizer, build_torch_optimizer, make_lr_decay_fn
+from utils.misc import edit_distance, save_checkpoint
 
-from itertools import cycle
+from models.ASR import ASRModel
 
+def maybe_update_dropout(model, step):
+    pass
 
-def main(opt):
-    ArgumentParser.validate_train_opts(opt)
-    ArgumentParser.update_model_opts(opt)
-    ArgumentParser.validate_model_opts(opt)
+def validate(valid_model, valid_dataloader, vocab, opts):
+    # Identify device to run the model on
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    # Load checkpoint if we resume from a previous training.
-    if opt.train_from:
-        logger.info('Loading checkpoint from %s' % opt.train_from)
-        checkpoint = torch.load(opt.train_from,
-                                map_location=lambda storage, loc: storage)
-        logger.info('Loading vocab from checkpoint at %s.' % opt.train_from)
-        vocab = checkpoint['vocab']
+    # Set model in validating mode.
+    valid_model.eval()
+    valid_model.to(device)
+
+    # Initialize statistics
+    total_ed = 0
+    total_toks = 0
+    total_logp = 0.0
+
+    # Enumerate over batch
+    for i, batch in enumerate(valid_dataloader):
+        src, src_len, tgt, tgt_len, feat = batch
+
+        # Copy to device
+        src = src.to(device)
+        src_len = src_len.to(device)
+
+        # Beam-search decode
+        utterances = beam_decode(valid_model, vocab, src, src_len, opts, device)
+
+        # Compute statistics
+        for j in range(src.size(1)):
+            nbest = utterances[j]
+            target = tgt[:, j]
+            target = target[target.ne(0)].cpu().numpy().tolist()
+            idx, log_p = max(enumerate(nbest), key=lambda x: x[1])
+            # total_ed += min([edit_distance(x, target) for x, _ in nbest])
+            total_ed += edit_distance(nbest[idx], target)
+            total_toks += tgt_len[j].item()
+            total_logp += log_p
+
+    return -total_logp/total_toks, float(total_ed)/total_toks
+
+def main(opts):
+    # Load vocabulary and feature extractor
+    vocab = torch.load(os.path.join(opts.data, 'vocab.pt'))
+    logger.info('Loaded vocabulary from %s, size %d' % \
+        (os.path.join(opts.data, 'vocab.pt'), len(vocab)))
+    # Add vocabulary arguments to opts
+    opts.vocab_size = len(vocab)
+    opts.padding_idx = vocab.encode('<pad>')
+
+    feat_ext = torch.load(os.path.join(opts.data, 'feat_ext.pt'))
+    # Add feat arguments to opts
+    opts.input_size = feat_ext.feat_dim
+
+    # Identify device to run the model on
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    # Build data loader(s)
+    train_dataloader = ShardedDataLoader(
+        shard_root_dir=opts.data,
+        batch_size=opts.batch_size,
+        bucket_size=opts.bucket_size,
+        padding_idx=0,
+        mode='train',
+        repeat=not opts.single_pass)
+
+    valid_dataloader = ShardedDataLoader(
+        shard_root_dir=opts.data,
+        batch_size=opts.batch_size,
+        bucket_size=opts.bucket_size,
+        padding_idx=0,
+        mode='valid',
+        repeat=False)
+
+    # Define objective
+    criterion = ShardedCELoss()
+
+    # Build model
+    if opts.train_from and os.path.exists(opts.train_from):
+        # Load checkpoint if we resume from a previous training
+        logger.info('Loading checkpoint from %s' % opts.train_from)
+        checkpoint = torch.load(opts.train_from, \
+            map_location=lambda storage, loc: storage)
+        ckpt_opts = checkpoint['opts']
+
+        # Build model and optimizer
+        model = ASRModel(ckpt_opts)
+        model.load_state_dict(checkpoint['model'], strict=False)
+
+        optimizer = Optimizer(
+            optimizer=build_torch_optimizer(model, ckpt_opts),
+            learning_rate=ckpt_opts.learning_rate,
+            learning_rate_decay_fn=make_lr_decay_fn(ckpt_opts),
+            max_grad_norm=ckpt_opts.max_grad_norm)
+        optimizer.load_state_dict(checkpoint['optim'])
+
     else:
-        vocab = torch.load(opt.data + '.vocab.pt')
+        logger.info('Building model')
+        model = ASRModel(opts)
+        if opts.param_init != 0.0:
+            for p in model.parameters():
+                p.data.uniform_(-opts.param_init, opts.param_init)
+        if opts.param_init_glorot:
+            for p in model.parameters():
+                if p.dim() > 1:
+                    xavier_uniform_(p)
 
-    # check for code where vocab is saved instead of fields
-    # (in the future this will be done in a smarter way)
-    if old_style_vocab(vocab):
-        fields = load_old_vocab(
-            vocab, opt.model_type, dynamic_dict=opt.copy_attn)
-    else:
-        fields = vocab
+        logger.info('Building optimizer')
+        optimizer = Optimizer(
+            optimizer=build_torch_optimizer(model, opts),
+            learning_rate=opts.learning_rate,
+            learning_rate_decay_fn=make_lr_decay_fn(opts),
+            max_grad_norm=opts.max_grad_norm)
 
-    if len(opt.data_ids) > 1:
-        train_shards = []
-        for train_id in opt.data_ids:
-            shard_base = "train_" + train_id
-            train_shards.append(shard_base)
-        train_iter = build_dataset_iter_multiple(train_shards, fields, opt)
-    else:
-        if opt.data_ids[0] is not None:
-            shard_base = "train_" + opt.data_ids[0]
-        else:
-            shard_base = "train"
-        train_iter = build_dataset_iter(shard_base, fields, opt)
+    logger.info(model)
+    logger.info('#Parameters: %d' % sum([p.nelement() for p in model.parameters()]))
 
-    nb_gpu = len(opt.gpu_ranks)
+    ################################################################################
+    best_val_er = None
+    train_loss = 0.0
+    start_time = time.time()
 
-    if opt.world_size > 1:
-        queues = []
-        mp = torch.multiprocessing.get_context('spawn')
-        semaphore = mp.Semaphore(opt.world_size * opt.queue_size)
-        # Create a thread to listen for errors in the child processes.
-        error_queue = mp.SimpleQueue()
-        error_handler = ErrorHandler(error_queue)
-        # Train with multiprocessing.
-        procs = []
-        for device_id in range(nb_gpu):
-            q = mp.Queue(opt.queue_size)
-            queues += [q]
-            procs.append(mp.Process(target=run, args=(
-                opt, device_id, error_queue, q, semaphore), daemon=True))
-            procs[device_id].start()
-            logger.info(" Starting process pid: %d  " % procs[device_id].pid)
-            error_handler.add_child(procs[device_id].pid)
-        producer = mp.Process(target=batch_producer,
-                              args=(train_iter, queues, semaphore, opt,),
-                              daemon=True)
-        producer.start()
-        error_handler.add_child(producer.pid)
+    for i, batch in enumerate(train_dataloader):
+        model.train()
+        src, src_len, tgt, tgt_len, feat = batch
+        step = optimizer.training_step
 
-        for p in procs:
-            p.join()
-        producer.terminate()
+        # Copy to device
+        src = src.to(device)
+        src_len = src_len.to(device)
+        tgt = tgt.to(device)
+        tgt_len = tgt_len.to(device)
 
-    elif nb_gpu == 1:  # case 1 GPU only
-        single_main(opt, 0)
-    else:   # case only CPU
-        single_main(opt, -1)
+        # Update dropout
+        maybe_update_dropout(model, step)
 
+        # Perform BPTT
+        bptt = False
+        trunc_size = opts.bptt if opts.bptt > 0 else tgt.size(0)
+        normalization = src_len.sum().item()
 
-def batch_producer(generator_to_serve, queues, semaphore, opt):
-    init_logger(opt.log_file)
-    set_random_seed(opt.seed, False)
-    # generator_to_serve = iter(generator_to_serve)
+        for j in range(0, tgt.size(0)-1, trunc_size):
+            # Find truncated target
+            tgt_trunc = tgt[j : j+trunc_size]
+            # Clear accumulated gradients
+            optimizer.zero_grad()
+            # F-prop model
+            dec_outs, attns = model(src, tgt_trunc, src_len, bptt=bptt)
+            # Enable BPTT for next chunks
+            bptt = True
+            # Compute loss
+            loss, bprop = criterion(
+                target=tgt,
+                output=dec_outs,
+                normalization=normalization,
+                shard_size=opts.shard_size,
+                trunc_start=j,
+                trunc_size=trunc_size)
+            # B-prop loss and accumulate gradients
+            if bprop:
+                optimizer.backward(loss)
+            optimizer.step()
+            # Do not b-prop fully when truncated
+            if model.decoder.state is not None:
+                model.decoder.detach_state()
+            # Update statistics
+            train_loss += loss.item()
 
-    def pred(x):
-        """
-        Filters batches that belong only
-        to gpu_ranks of current node
-        """
-        for rank in opt.gpu_ranks:
-            if x[0] % opt.world_size == rank:
-                return True
+        # Print status
+        if i>0 and i % opts.print_every == 0:
+            logger.info('Batches %d Avg. NLL %.4f Time %.2f' % \
+                (i, train_loss/opts.print_every, time.time()-start_time))
+            train_loss = 0.0
+            start_time = time.time()
 
-    generator_to_serve = filter(
-        pred, enumerate(generator_to_serve))
+        # Validation
+        if i % opts.valid_steps == 0:
+            logger.info('Validating performance')
+            val_loss, val_er = validate(model, valid_dataloader, vocab, opts)
+            logger.info('Avg. NLL %.4f, Avg. ER %.2f' % (val_loss, 100.0*val_er))
 
-    def next_batch(device_id):
-        new_batch = next(generator_to_serve)
-        semaphore.acquire()
-        return new_batch[1]
+            if best_val_er is None or val_er < best_val_er:
+                best_val_er = val_er
+                p = save_checkpoint(opts.save_dir, step, model, optimizer, opts)
+                logger.info('Saved model checkpoint %s' % p)
 
-    b = next_batch(0)
-
-    for device_id, q in cycle(enumerate(queues)):
-        b.dataset = None
-        if isinstance(b.src, tuple):
-            b.src = tuple([_.to(torch.device(device_id))
-                           for _ in b.src])
-        else:
-            b.src = b.src.to(torch.device(device_id))
-        b.tgt = b.tgt.to(torch.device(device_id))
-        b.indices = b.indices.to(torch.device(device_id))
-        b.alignment = b.alignment.to(torch.device(device_id)) \
-            if hasattr(b, 'alignment') else None
-        b.src_map = b.src_map.to(torch.device(device_id)) \
-            if hasattr(b, 'src_map') else None
-
-        # hack to dodge unpicklable `dict_keys`
-        b.fields = list(b.fields)
-        q.put(b)
-        b = next_batch(device_id)
-
-
-def run(opt, device_id, error_queue, batch_queue, semaphore):
-    """ run process """
-    try:
-        gpu_rank = onmt.utils.distributed.multi_init(opt, device_id)
-        if gpu_rank != opt.gpu_ranks[device_id]:
-            raise AssertionError("An error occurred in \
-                  Distributed initialization")
-        single_main(opt, device_id, batch_queue, semaphore)
-    except KeyboardInterrupt:
-        pass  # killed by parent, do nothing
-    except Exception:
-        # propagate exception to parent process, keeping original traceback
-        import traceback
-        error_queue.put((opt.gpu_ranks[device_id], traceback.format_exc()))
-
-
-class ErrorHandler(object):
-    """A class that listens for exceptions in children processes and propagates
-    the tracebacks to the parent process."""
-
-    def __init__(self, error_queue):
-        """ init error handler """
-        import signal
-        import threading
-        self.error_queue = error_queue
-        self.children_pids = []
-        self.error_thread = threading.Thread(
-            target=self.error_listener, daemon=True)
-        self.error_thread.start()
-        signal.signal(signal.SIGUSR1, self.signal_handler)
-
-    def add_child(self, pid):
-        """ error handler """
-        self.children_pids.append(pid)
-
-    def error_listener(self):
-        """ error listener """
-        (rank, original_trace) = self.error_queue.get()
-        self.error_queue.put((rank, original_trace))
-        os.kill(os.getpid(), signal.SIGUSR1)
-
-    def signal_handler(self, signalnum, stackframe):
-        """ signal handler """
-        for pid in self.children_pids:
-            os.kill(pid, signal.SIGINT)  # kill children processes
-        (rank, original_trace) = self.error_queue.get()
-        msg = """\n\n-- Tracebacks above this line can probably
-                 be ignored --\n\n"""
-        msg += original_trace
-        raise Exception(msg)
-
-
-def _get_parser():
-    parser = ArgumentParser(description='train.py')
-
-    opts.config_opts(parser)
-    opts.model_opts(parser)
-    opts.train_opts(parser)
-    return parser
+        # Termination condition
+        if not opts.single_pass and i >= opts.train_steps:
+            break
 
 
 if __name__ == "__main__":
-    parser = _get_parser()
-
-    opt = parser.parse_args()
-    main(opt)
+    parser = ArgumentParser(description='train.py')
+    parser = build_train_parser(parser)
+    opts = parser.parse_args()
+    main(opts)
