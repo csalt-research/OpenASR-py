@@ -44,6 +44,7 @@ def sequence_mask(lengths, max_len=None):
             .lt(lengths.unsqueeze(1)))
 
 def save_checkpoint(save_dir, step, model, optimizer, opts):
+    ensure_dir(save_dir)
     checkpoint = {
         'model': model.state_dict(),
         'optim': optimizer.state_dict(),

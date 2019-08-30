@@ -30,18 +30,18 @@ def preprocess(opts):
     torch.save(feat_ext, os.path.join(opts.save_dir, 'feat_ext.pt'))
 
     # Build train shards
-    # for src_train, tgt_train in zip(opts.src_train, opts.tgt_train):
-    #    accent = src_train.split('/')[-2]
-    #    feats = {'accent': ACCENTS[accent], 'labeled': accent=='us'}
-    #    build_shards(src_dir=opts.src_dir, 
-    #                 save_dir=os.path.join(opts.save_dir, accent), 
-    #                 src_file=src_train, 
-    #                 tgt_file=tgt_train,
-    #                 vocab=vocab,
-    #                 shard_size=opts.shard_size,
-    #                 feat_ext=feat_ext, 
-    #                 mode='train', 
-    #                 feats=feats)
+    for src_train, tgt_train in zip(opts.src_train, opts.tgt_train):
+       accent = src_train.split('/')[-2]
+       feats = {'accent': ACCENTS[accent], 'labeled': accent=='us'}
+       build_shards(src_dir=opts.src_dir, 
+                    save_dir=os.path.join(opts.save_dir, accent), 
+                    src_file=src_train, 
+                    tgt_file=tgt_train,
+                    vocab=vocab,
+                    shard_size=opts.shard_size,
+                    feat_ext=feat_ext, 
+                    mode='train', 
+                    feats=feats)
 
     # Build validation shards
     for src_valid, tgt_valid in zip(opts.src_valid, opts.tgt_valid):

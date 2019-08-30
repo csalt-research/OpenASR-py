@@ -10,7 +10,7 @@ def build_train_parser(parser):
 def model_opts(parser):
     # Embedding
     group = parser.add_argument_group('Model - Embeddings')
-    group.add('--embedding_size', type=int, default=500,
+    group.add('--embedding_size', type=int, default=256,
               help='Token embedding size for target')
     group.add('--share_dec_weights', action='store_true',
               help="Use a shared weight matrix for the input and "
@@ -36,9 +36,9 @@ def model_opts(parser):
     group = parser.add_argument_group('Model - Encoder')
     group.add('--enc_rnn_type', type=str, default='LSTM', choices=['LSTM', 'GRU'],
               help="Type of encoder RNN layer to use.")
-    group.add('--enc_layers', type=int, default=4,
+    group.add('--enc_layers', type=int, default=3,
               help='Number of layers in the encoder')
-    group.add('--enc_rnn_size', type=int, default=500,
+    group.add('--enc_rnn_size', type=int, default=512,
               help="Size of encoder rnn hidden states.")
     group.add('--brnn', action='store_true',
               help="Whether to use bidirectional encoder.")
@@ -47,7 +47,7 @@ def model_opts(parser):
                    "either the same amount of pooling across all layers "
                    "indicated by a single number, or different amounts of "
                    "pooling per layer separated by comma.")
-    group.add('--enc_dropout', type=float, default=0.3,
+    group.add('--enc_dropout', type=float, default=0.0,
               help="Dropout probability for encoder.")
 
     # Decoder
@@ -56,11 +56,11 @@ def model_opts(parser):
               help="Type of decoder RNN layer to use.")
     group.add('--dec_layers', type=int, default=2,
               help='Number of layers in the decoder')
-    group.add('--dec_rnn_size', type=int, default=500,
+    group.add('--dec_rnn_size', type=int, default=256,
               help="Size of decoder rnn hidden states.")
-    group.add('--dec_dropout', type=float, default=0.3,
+    group.add('--dec_dropout', type=float, default=0.0,
               help="Dropout probability for decoder.")
-    group.add('--init_sched_sampling_rate', type=float, default=0.2,
+    group.add('--init_sched_sampling_rate', type=float, default=0.0,
               help="Initial rate for scheduled sampling")
 
     # Attention

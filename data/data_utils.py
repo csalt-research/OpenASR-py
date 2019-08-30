@@ -91,7 +91,7 @@ def build_shards(src_dir, save_dir, src_file, tgt_file, vocab,
         shard = {
             'src': np.asarray(audio_feats), 
             'tgt': np.asarray(transcriptions), 
-            'indices': np.asarray(indices).reshape(-1,1),
+            'indices': np.asarray([np.asarray(x).reshape(-1,1) for x in indices]),
             'feats': feats
         }
 

@@ -47,10 +47,11 @@ class RNNDecoder(nn.Module):
 
     def init_state(self, encoder_final):
         batch_size = encoder_final[0].size(1)
+        device = encoder_final[0].device
         self.state["hidden"] = encoder_final
         self.state["input_feed"] = encoder_final[0].data \
             .new_zeros((batch_size, self.hidden_size)) \
-            .unsqueeze(0)
+            .unsqueeze(0).to(device)
 
     def map_state(self, fn):
         self.state["hidden"] = tuple(fn(h, 1) for h in self.state["hidden"])
@@ -63,13 +64,21 @@ class RNNDecoder(nn.Module):
     def forward(self, tgt, memory_bank, memory_lengths=None):
         input_feed = self.state["input_feed"].squeeze(0)
         input_feed_batch, _ = input_feed.size()
-        _, tgt_batch, _ = tgt.size()
+        
+        if tgt.dim() == 2:
+            decoding = True
+            tgt_batch = 1
+            tgt = tgt.unsqueeze(0)
+        else:
+            t, tgt_batch, _ = tgt.size()
+            decoding = False
+
         assert input_feed_batch == tgt_batch
 
         dec_outs, attns = [], []
 
         dec_state = self.state["hidden"]
-        current_input = self.embeddings(tgt[0])
+        current_input = self.embeddings(tgt[0].unsqueeze(0)).squeeze(0)
 
         # Input feed concatenates the `hidden state` with input at every time
         # step when attention module is absent, and the `context vector` when
@@ -79,7 +88,8 @@ class RNNDecoder(nn.Module):
         use_teacher_forcing = random.random() > self.sched_sampling_rate
 
         # Iterate over timesteps
-        for t in tgt.size(0):
+        max_time = tgt.size(0) if not decoding else 2
+        for t in range(1, max_time):
             decoder_input = torch.cat([current_input, input_feed], 1)
             rnn_output, dec_state = self.rnn(decoder_input, dec_state)
 
@@ -105,11 +115,12 @@ class RNNDecoder(nn.Module):
             scores = self.generator(decoder_output)
             dec_outs += [scores]
 
-            if use_teacher_forcing and t+1 != tgt.size(0):
-                current_input = self.embeddings(tgt[t+1])
+            if use_teacher_forcing and not decoding:
+                current_input = self.embeddings(tgt[t].unsqueeze(0)).squeeze(0)
             else:
-                idx = torch.max(scores, dim=1)
-                current_input = self.embeddings(idx)
+                _, idx = torch.max(scores, dim=1)
+                idx = idx.view(1, -1, 1)
+                current_input = self.embeddings(idx).squeeze(0)
 
         # Update state variables
         self.state["hidden"] = dec_state

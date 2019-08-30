@@ -56,9 +56,6 @@ class ShardedDataLoader(object):
             max_len - length upto which each sequence is to be padded
             sort    - whether to sort by descending order of lengths
         """
-        print(lst)
-        assert len(lst[0].shape) == 2
-
         lengths = np.asarray([x.shape[0] for x in lst])
         T = max_len if max_len is not None else max(lengths)
         B = len(lst)
@@ -74,9 +71,6 @@ class ShardedDataLoader(object):
 
     def __iter__(self):
         while True:
-            if self.order.size == 0:
-                self.load_next_shard()
-
             current_batch = self.order[:self.batch_size]
             self.order = self.order[self.batch_size:]
 
@@ -85,10 +79,17 @@ class ShardedDataLoader(object):
             feat = self.shard['feats'] 
 
             src, src_len, idx = self.pad(src, sort=True)
-            tgt, tgt_len = self.pad(tgt)[:, idx, :]
+            tgt, tgt_len = self.pad(tgt)
+            tgt, tgt_len = tgt[:, idx], tgt_len[idx]
             
-            yield torch.tensor(src), torch.tensor(src_len), \
-                torch.tensor(tgt), torch.tensor(tgt_len), feat
+            # print(src.shape, src_len.shape, tgt.shape, tgt_len.shape)
 
-            if self.pointer == 0 and not self.repeat:
-                break
+            yield torch.FloatTensor(src), torch.LongTensor(src_len), \
+                torch.LongTensor(tgt), torch.LongTensor(tgt_len), feat
+
+            if self.order.size == 0:
+                if self.pointer == 0 and not self.repeat:
+                    self.load_next_shard()
+                    break
+                else:
+                    self.load_next_shard()

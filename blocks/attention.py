@@ -85,7 +85,7 @@ class GlobalAttention(nn.Module):
         concat_c = torch.cat([c, source], 2).view(batch*target_l, dim*2)
         attn_h = self.linear_out(concat_c).view(batch, target_l, dim)
         
-        if self.attn_type in ["general", "dot"]:
+        if self.attention_type in ["general", "dot"]:
             attn_h = torch.tanh(attn_h)
 
         if one_step:

@@ -11,7 +11,7 @@ class ShardedCELoss(nn.Module):
         return {"output": output, "target": target[range_[0] + 1: range_[1], :, 0]}
 
     def _compute_loss(self, target, output):
-        scores = output.view(-1)
+        scores = output.view(-1, output.size(2))
         gtruth = target.view(-1)
         loss = self.criterion(scores, gtruth)
         return loss
@@ -30,12 +30,12 @@ class ShardedCELoss(nn.Module):
         shard_state = self._make_shard_state(target, output, trunc_range)
         
         if shard_size == 0:
-            loss = self._compute_loss(target, **shard_state)
+            loss = self._compute_loss(**shard_state)
             return loss / float(normalization), True
 
         total_loss = 0.0
         for shard in shards(shard_state, shard_size):
-            loss = self._compute_loss(target, **shard)
+            loss = self._compute_loss(**shard)
             loss.div(float(normalization)).backward()
             total_loss += loss.item()
         return total_loss, False
