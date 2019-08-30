@@ -67,4 +67,12 @@ def edit_distance(s1, s2):
             else:
                 distances_.append(1 + min((distances[i1], distances[i1 + 1], distances_[-1])))
         distances = distances_
+
     return distances[-1]
+
+def ensure_dir(path):
+    if os.path.exists(path) and os.path.isdir(path):
+        return
+    else:
+        os.makedirs(path)
+        return

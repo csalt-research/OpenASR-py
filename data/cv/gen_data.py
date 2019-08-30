@@ -1,14 +1,14 @@
 import pandas as pd
 
-root_dir = '.'
+root_dir = '/home/yash/accent-adaptation/data/cv'
 train_tsv = 'non_us_train.tsv'
 test_tsv = 'non_us_test.tsv'
-accent = 'australian'
+accent = 'england'
 
-tr_tsv_file = pd.read_csv(root_dir + '/' + train_tsv, sep='\t', index_col=0)
-tr_tsv_file = tr_tsv_file[tr_tsv_file['accent'] == accent]
-te_tsv_file = pd.read_csv(root_dir + '/' + test_tsv, sep='\t', index_col=0)
-te_tsv_file = te_tsv_file[te_tsv_file['accent'] == accent]
+whole_tr_tsv_file = pd.read_csv(root_dir + '/' + train_tsv, sep='\t', index_col=0)
+tr_tsv_file = whole_tr_tsv_file[whole_tr_tsv_file['accent'] == accent]
+whole_te_tsv_file = pd.read_csv(root_dir + '/' + test_tsv, sep='\t', index_col=0)
+te_tsv_file = whole_te_tsv_file[whole_te_tsv_file['accent'] == accent]
 
 tr_trans = list(tr_tsv_file['Transcripts'])
 tr_files = list(tr_tsv_file['file1'])

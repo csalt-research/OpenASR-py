@@ -30,7 +30,10 @@ class StackedLSTM(nn.Module):
 
     def flatten_parameters(self):
         for layer in self.layers:
-            layer.flatten_parameters()
+            layer.weight_ih = layer.weight_ih.contiguous()
+            layer.weight_hh = layer.weight_hh.contiguous()
+            layer.bias_ih = layer.bias_ih.contiguous()
+            layer.bias_hh = layer.bias_hh.contiguous()
 
 class StackedGRU(nn.Module):
     def __init__(self, num_layers, input_size, rnn_size, dropout):
@@ -57,4 +60,7 @@ class StackedGRU(nn.Module):
 
     def flatten_parameters(self):
         for layer in self.layers:
-            layer.flatten_parameters()
+            layer.weight_ih = layer.weight_ih.contiguous()
+            layer.weight_hh = layer.weight_hh.contiguous()
+            layer.bias_ih = layer.bias_ih.contiguous()
+            layer.bias_hh = layer.bias_hh.contiguous()

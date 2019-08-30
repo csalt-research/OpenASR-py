@@ -24,7 +24,7 @@ class RNNDecoder(nn.Module):
         self.input_size = embeddings.embedding_size + hidden_size
         rnn_class = StackedLSTM if rnn_type == 'LSTM' else StackedGRU
         self.rnn = rnn_class(input_size=self.input_size,
-                             hidden_size=hidden_size,
+                             rnn_size=hidden_size,
                              num_layers=num_layers,
                              dropout=dropout)
         

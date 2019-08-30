@@ -36,13 +36,13 @@ def model_opts(parser):
     group = parser.add_argument_group('Model - Encoder')
     group.add('--enc_rnn_type', type=str, default='LSTM', choices=['LSTM', 'GRU'],
               help="Type of encoder RNN layer to use.")
-    group.add('--enc_layers', type=int, default=2,
+    group.add('--enc_layers', type=int, default=4,
               help='Number of layers in the encoder')
     group.add('--enc_rnn_size', type=int, default=500,
               help="Size of encoder rnn hidden states.")
     group.add('--brnn', action='store_true',
               help="Whether to use bidirectional encoder.")
-    group.add('--enc_pooling', type=str, default='1',
+    group.add('--enc_pooling', type=str, default='2',
               help="The amount of pooling of audio encoder, "
                    "either the same amount of pooling across all layers "
                    "indicated by a single number, or different amounts of "
@@ -60,7 +60,7 @@ def model_opts(parser):
               help="Size of decoder rnn hidden states.")
     group.add('--dec_dropout', type=float, default=0.3,
               help="Dropout probability for decoder.")
-    group.add('--init_sched_sampling_rate', type=float, default=0.1,
+    group.add('--init_sched_sampling_rate', type=float, default=0.2,
               help="Initial rate for scheduled sampling")
 
     # Attention
@@ -168,14 +168,13 @@ def train_opts(parser):
               help="Make a single pass over the training dataset.")
 
     group.add('--optim', default='sgd',
-              choices=['sgd', 'adagrad', 'adadelta', 'adam',
-                       'sparseadam', 'adafactor', 'fusedadam'],
+              choices=['sgd', 'adagrad', 'adadelta', 'adam'],
               help="Optimization method.")
     group.add('--adagrad_accumulator_init', type=float, default=0,
               help="Initializes the accumulator values in adagrad. "
                    "Mirrors the initial_accumulator_value option "
                    "in the tensorflow adagrad (use 0.1 for their default).")
-    group.add('--max_grad_norm', type=float, default=5,
+    group.add('--max_grad_norm', type=float, default=10,
               help="If the norm of the gradient vector exceeds this, "
                    "renormalize it to have the norm equal to "
                    "max_grad_norm")

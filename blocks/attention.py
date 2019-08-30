@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from onmt.utils.misc import aeq, sequence_mask
+from utils.misc import sequence_mask
 
 class GlobalAttention(nn.Module):
     def __init__(self, input_size, attention_type="dot"):
@@ -10,6 +10,7 @@ class GlobalAttention(nn.Module):
 
         self.input_size = input_size
         self.attention_type = attention_type
+        dim = self.input_size
 
         if attention_type == "general":
             self.linear_in = nn.Linear(dim, dim, bias=False)
