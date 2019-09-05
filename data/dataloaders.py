@@ -83,9 +83,9 @@ class ShardedDataLoader(object):
             tgt, tgt_len = tgt[:, idx], tgt_len[idx]
             
             # print(src.shape, src_len.shape, tgt.shape, tgt_len.shape)
-
-            yield torch.FloatTensor(src), torch.LongTensor(src_len), \
-                torch.LongTensor(tgt), torch.LongTensor(tgt_len), feat
+            if feat['accent'] == 0: 
+                yield torch.FloatTensor(src), torch.LongTensor(src_len), \
+                    torch.LongTensor(tgt), torch.LongTensor(tgt_len), feat
 
             if self.order.size == 0:
                 if self.pointer == 0 and not self.repeat:
