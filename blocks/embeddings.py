@@ -13,9 +13,6 @@ class Embedding(nn.Module):
                  feat_vocab_sizes=[],
                  feat_padding_idx=[],
                  fix_word_vecs=False):
-        self._validate_args(feat_merge, feat_vocab_sizes, feat_vec_exponent,
-                            feat_vec_size, feat_padding_idx)
-
         if feat_padding_idx is None:
             feat_padding_idx = []
         self.word_padding_idx = word_padding_idx
@@ -43,7 +40,7 @@ class Embedding(nn.Module):
         # The embedding matrix look-up tables. The first look-up table
         # is for words. Subsequent ones are for features, if any exist.
         emb_params = zip(vocab_sizes, emb_dims, pad_indices)
-        embeddings = [nn.Embedding(vocab, dim, padding_idx=pad, sparse=sparse)
+        embeddings = [nn.Embedding(vocab, dim, padding_idx=pad)
                       for vocab, dim, pad in emb_params]
         emb_luts = Elementwise(feat_merge, embeddings)
 
@@ -59,7 +56,7 @@ class Embedding(nn.Module):
         # looking up the embeddings for each word and feature in the
         # input. Model parameters may require the sequence to contain
         # additional operations as well.
-        super(Embeddings, self).__init__()
+        super(Embedding, self).__init__()
         self.make_embedding = nn.Sequential()
         self.make_embedding.add_module('emb_luts', emb_luts)
 

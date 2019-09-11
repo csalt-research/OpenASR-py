@@ -52,7 +52,7 @@ class ASRModel(nn.Module):
         )
         self.generator = nn.Sequential(
             nn.Linear(opts.dec_rnn_size, opts.vocab_size, bias=False),
-            nn.LogSoftmax()
+            nn.LogSoftmax(dim=-1)
         )
         self.embeddings = Embedding(
             word_vec_size=opts.embedding_size,

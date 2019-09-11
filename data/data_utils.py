@@ -1,11 +1,12 @@
 import torch
 import os
 from tqdm import tqdm
-import warnings
 import numpy as np
+from multiprocessing.pool import Pool
 
 from itertools import islice, cycle
 from utils.logging import logger
+from utils.misc import ensure_dir
 
 class Vocab(object):
     def __init__(self):
@@ -28,8 +29,13 @@ class Vocab(object):
     def encode(self, token):
         return self.tok2idx.get(token, self.tok2idx['<unk>'])
 
+    def decode(self, token_id):
+        assert token_id < len(self.idx2tok), \
+            'token id must be less than %d, got %d' % (len(self.idx2tok), token_id)
+        return self.idx2tok[token_id]
+
 def split_corpus(path, shard_size):
-    with open(path, "rb") as f:
+    with open(path, "r") as f:
         if shard_size <= 0:
             yield f.readlines()
         else:
@@ -57,36 +63,40 @@ def build_vocab(src_file, max_vocab_size=0):
             ret.add(t)
         return ret
 
+def _worker(args):
+    src, tgt, feat_ext, vocab = args
+    if tgt == '':
+        return None
+    return feat_ext(src), tgt, [vocab.encode(x) for x in ('<bos> '+tgt+' <eos>').split()]
+
 def build_shards(src_dir, save_dir, src_file, tgt_file, vocab,
                  shard_size, feat_ext, mode='train', feats=None
                  ):
     src_shards = split_corpus(src_file, shard_size)
     tgt_shards = split_corpus(tgt_file, shard_size)
 
+    ensure_dir(save_dir)
+
     shard_index = 0
     for src_shard, tgt_shard in zip(src_shards, tgt_shards):
         logger.info('Building %s shard %d' % (mode, shard_index))
-        
-        audio_feats = []
-        transcriptions = []
-        indices = []
+        audio_paths = [os.path.join(src_dir, p.strip()) for p in src_shard]
+        assert all([os.path.exists(p) for p in audio_paths]), \
+            "following audio files not found: %s" % \
+            ' '.join([p.strip() for p in audio_paths if not os.path.exists(p)])
+        targets = [t.strip() for t in tgt_shard]
 
-        for src, tgt in tqdm(list(zip(src_shard, tgt_shard))):
-            
-            audio_path = os.path.join(src_dir, src.strip())
-            if not os.path.exists(audio_path):
-                audio_path = src.strip()
-            assert os.path.exists(audio_path), \
-                "audio file %s not found" % audio_path
+        src_tgt_pairs = list(zip(audio_paths, targets, cycle([feat_ext]), cycle([vocab])))
 
-            audio_feats.append(feat_ext(audio_path))
-            transcriptions.append(tgt.strip())
-            indices.append([vocab.encode(x) for x in ('<bos> '+tgt+' <eos>').split()])
+        with Pool(50) as p:
+            result = list(tqdm(p.imap(_worker, src_tgt_pairs), total=len(src_tgt_pairs)))
+            result = [r for r in result if r is not None]
+            audio_feats, transcriptions, indices = zip(*result)
 
         shard = {
             'src': np.asarray(audio_feats), 
             'tgt': np.asarray(transcriptions), 
-            'indices': np.asarray(indices).reshape(-1,1),
+            'indices': np.asarray([np.asarray(x).reshape(-1,1) for x in indices]),
             'feats': feats
         }
 

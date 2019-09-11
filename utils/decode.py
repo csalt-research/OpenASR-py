@@ -17,6 +17,11 @@ class BeamSearchNode(object):
         # TODO: Add here a function for shaping a reward
         return self.logp / float(self.leng - 1 + 1e-6) + alpha * reward
 
+    def __lt__(self, _):
+        # Called when `score` of two nodes is same when
+        # they are being inserted into a PriorityQueue
+        return True
+
 def beam_decode(model, vocab, src, lengths, opts, device):
     with torch.no_grad():
         # F-prop through encoder to get state
@@ -27,7 +32,7 @@ def beam_decode(model, vocab, src, lengths, opts, device):
         # Parameters
         beam_width = opts.beam_width
         topk = opts.nbest
-        SOS_token = vocab.encode('<sos>')
+        SOS_token = vocab.encode('<bos>')
         EOS_token = vocab.encode('<eos>')
 
         decoded_batch = []
@@ -36,10 +41,11 @@ def beam_decode(model, vocab, src, lengths, opts, device):
         for idx in range(src.size(1)):
             enc_f = tuple([h[:, idx, ...].unsqueeze(1) for h in encoder_final])
             mem_b = memory_bank[:, idx, ...].unsqueeze(1)
+            nl = new_lengths[idx].unsqueeze(0)
             model.decoder.init_state(enc_f)
 
             # Start with the start of the sentence token
-            decoder_input = torch.LongTensor([[SOS_token]], device=device)
+            decoder_input = torch.LongTensor([[SOS_token]]).to(device)
 
             # Number of sentence to generate
             endnodes = []
@@ -72,7 +78,7 @@ def beam_decode(model, vocab, src, lengths, opts, device):
 
                 # Decode for one step using decoder
                 model.decoder.state = decoder_state
-                decoder_output, _ = model.decoder(decoder_input, mem_b, new_lengths)
+                decoder_output, _ = model.decoder(decoder_input, mem_b, nl)
 
                 log_prob, indexes = torch.topk(decoder_output.squeeze(), beam_width)
                 nextnodes = []
@@ -86,7 +92,7 @@ def beam_decode(model, vocab, src, lengths, opts, device):
                     nextnodes.append((score, node))
 
                 # Put them into queue
-                for (score, n) in nextnodes:
+                for score, n in nextnodes:
                     nodes.put((score, n))
                 qsize += len(nextnodes) - 1
 
@@ -98,10 +104,10 @@ def beam_decode(model, vocab, src, lengths, opts, device):
             for score, n in sorted(endnodes, key=lambda x: x[0]):
                 utterance = []
                 log_p = n.logp
-                utterance.append(n.token_id)
+                utterance.append(n.token_id.item())
                 while n.prev_node != None:
                     n = n.prev_node
-                    utterance.append(n.token_id)
+                    utterance.append(n.token_id.item())
                 utterance = utterance[::-1]
                 utterances.append((utterance, log_p))
 

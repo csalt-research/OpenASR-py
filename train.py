@@ -46,10 +46,15 @@ def validate(valid_model, valid_dataloader, vocab, opts):
             nbest = utterances[j]
             target = tgt[:, j]
             target = target[target.ne(0)].cpu().numpy().tolist()
-            idx, log_p = max(enumerate(nbest), key=lambda x: x[1])
+            utt, log_p = max(nbest, key=lambda x: x[1])
             # total_ed += min([edit_distance(x, target) for x, _ in nbest])
-            total_ed += edit_distance(nbest[idx], target)
-            total_toks += tgt_len[j].item()
+            
+            # print('utterance', [vocab.decode(x) for x in utt])
+            # print('target', [vocab.decode(x) for x in target])
+            # print('*'*80)
+            
+            total_ed += edit_distance(utt, target)
+            total_toks += tgt_len[j].item() - 1
             total_logp += log_p
 
     return -total_logp/total_toks, float(total_ed)/total_toks
@@ -57,8 +62,8 @@ def validate(valid_model, valid_dataloader, vocab, opts):
 def main(opts):
     # Load vocabulary and feature extractor
     vocab = torch.load(os.path.join(opts.data, 'vocab.pt'))
-    logger.info('Loaded vocabulary from %s, size %d' % \
-        (os.path.join(opts.data, 'vocab.pt'), len(vocab)))
+    logger.info('Loaded vocabulary from %s, size %d {%s}' % \
+        (os.path.join(opts.data, 'vocab.pt'), len(vocab), ', '.join(vocab.idx2tok)))
     # Add vocabulary arguments to opts
     opts.vocab_size = len(vocab)
     opts.padding_idx = vocab.encode('<pad>')
@@ -134,6 +139,7 @@ def main(opts):
     best_val_er = None
     train_loss = 0.0
     start_time = time.time()
+    model.to(device)
 
     for i, batch in enumerate(train_dataloader):
         model.train()
@@ -141,10 +147,10 @@ def main(opts):
         step = optimizer.training_step
 
         # Copy to device
-        src = src.to(device)
-        src_len = src_len.to(device)
-        tgt = tgt.to(device)
-        tgt_len = tgt_len.to(device)
+        src = src.to(device).contiguous()
+        src_len = src_len.to(device).contiguous()
+        tgt = tgt.to(device).contiguous()
+        tgt_len = tgt_len.to(device).contiguous()
 
         # Update dropout
         maybe_update_dropout(model, step)
@@ -152,7 +158,8 @@ def main(opts):
         # Perform BPTT
         bptt = False
         trunc_size = opts.bptt if opts.bptt > 0 else tgt.size(0)
-        normalization = src_len.sum().item()
+        normalization = (tgt_len - 1).sum().item()
+        # normalization = opts.batch_size
 
         for j in range(0, tgt.size(0)-1, trunc_size):
             # Find truncated target
@@ -183,21 +190,20 @@ def main(opts):
 
         # Print status
         if i>0 and i % opts.print_every == 0:
-            logger.info('Batches %d Avg. NLL %.4f Time %.2f' % \
-                (i, train_loss/opts.print_every, time.time()-start_time))
+            logger.info(' * Batches %d/%d Avg. NLL %.4f Time %.2f' % \
+                (i, opts.train_steps, train_loss/opts.print_every, time.time()-start_time))
             train_loss = 0.0
             start_time = time.time()
 
         # Validation
-        if i % opts.valid_steps == 0:
+        if i>0 and i % opts.valid_steps == 0:
             logger.info('Validating performance')
             val_loss, val_er = validate(model, valid_dataloader, vocab, opts)
-            logger.info('Avg. NLL %.4f, Avg. ER %.2f' % (val_loss, 100.0*val_er))
+            logger.info(' * Avg. NLL %.4f, Avg. ER %.2f' % (val_loss, 100.0*val_er))
 
             if best_val_er is None or val_er < best_val_er:
                 best_val_er = val_er
                 p = save_checkpoint(opts.save_dir, step, model, optimizer, opts)
-                logger.info('Saved model checkpoint %s' % p)
 
         # Termination condition
         if not opts.single_pass and i >= opts.train_steps:

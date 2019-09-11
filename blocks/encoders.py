@@ -1,4 +1,5 @@
 import math
+import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
@@ -62,8 +63,8 @@ class RNNEncoder(nn.Module):
         self.flatten_parameters()
 
     def forward(self, src, lengths=None):
-        batch_size, _, nfft, t = src.size()
-        src = src.permute(3, 0, 2, 1).contiguous().view(t, batch_size, nfft)
+        _, batch_size, _ = src.size()
+        device = src.device
         orig_lengths = lengths
         lengths = lengths.view(-1).tolist()
         encoder_final = []
@@ -82,7 +83,6 @@ class RNNEncoder(nn.Module):
             # Unpack encoder's output sequence
             memory_bank = unpack(memory_bank)[0]
             # Sub-sample encoder's output along time dimension
-            t, _, _ = memory_bank.size()
             memory_bank = memory_bank.transpose(0, 2)
             memory_bank = pool(memory_bank)
             lengths = [int(math.floor((l - stride) / stride + 1)) for l in lengths]
@@ -101,19 +101,19 @@ class RNNEncoder(nn.Module):
         if self.rnn_type == 'LSTM':
             h_n, c_n = zip(*encoder_final)
             if self.num_directions == 2:
-                h_n = torch.stack([h.transpose(0,1).view(batch_size, -1) for h in h_n])
-                c_n = torch.stack([c.transpose(0,1).view(batch_size, -1) for c in c_n])
+                h_n = torch.stack([h.transpose(0,1).contiguous().view(batch_size, -1) for h in h_n])
+                c_n = torch.stack([c.transpose(0,1).contiguous().view(batch_size, -1) for c in c_n])
             else:
                 h_n = torch.stack([h.squeeze(0) for h in h_n])
                 c_n = torch.stack([c.squeeze(0) for c in c_n])
-            encoder_final = (h_n.contiguous(), c_n.contiguous())
+            encoder_final = (h_n.to(device).contiguous(), c_n.to(device).contiguous())
         else:
             h_n = encoder_final
             if self.num_directions == 2:
-                h_n = torch.stack([h.transpose(0,1).view(batch_size, -1) for h in h_n])
+                h_n = torch.stack([h.transpose(0,1).contiguous().view(batch_size, -1) for h in h_n])
             else:
                 h_n = torch.stack([h.squeeze(0) for h in h_n])
-            encoder_final = (h_n.contiguous(),)
+            encoder_final = (h_n.to(device).contiguous(),)
         return encoder_final, memory_bank.contiguous(), orig_lengths.new_tensor(lengths)
 
     def update_dropout(self, dropout):

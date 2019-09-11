@@ -44,6 +44,7 @@ def sequence_mask(lengths, max_len=None):
             .lt(lengths.unsqueeze(1)))
 
 def save_checkpoint(save_dir, step, model, optimizer, opts):
+    ensure_dir(save_dir)
     checkpoint = {
         'model': model.state_dict(),
         'optim': optimizer.state_dict(),
@@ -67,4 +68,12 @@ def edit_distance(s1, s2):
             else:
                 distances_.append(1 + min((distances[i1], distances[i1 + 1], distances_[-1])))
         distances = distances_
+
     return distances[-1]
+
+def ensure_dir(path):
+    if os.path.exists(path) and os.path.isdir(path):
+        return
+    else:
+        os.makedirs(path)
+        return

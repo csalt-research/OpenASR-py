@@ -1,14 +1,15 @@
 import sentencepiece as spm
 
-root_dir = 'us-v3'
+root_dir = 'indian'
 vocab_size = 512
 suffix = '.filtered'
 
 # train model
-spm.SentencePieceTrainer.train('--input={0} --model_prefix={1} --vocab_size={2} --character_coverage=1'.format(root_dir + '/tgt-train.txt'+suffix, root_dir, str(vocab_size)))
+# spm.SentencePieceTrainer.train('--input={0} --model_prefix={1} --vocab_size={2} --character_coverage=1'.format(root_dir + '/tgt-train.txt'+suffix, root_dir, str(vocab_size)))
 # decode sentences
 sp = spm.SentencePieceProcessor()
-sp.Load(root_dir + '.model')
+# sp.Load(root_dir + '.model')
+sp.Load('us.model')
 
 for split in ['train', 'val', 'test']:
     inp = open(root_dir + '/tgt-' + split + '.txt'+suffix, 'r')
