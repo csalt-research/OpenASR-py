@@ -82,7 +82,7 @@ def main(opts):
     valid_dataloader = ShardedDataLoader(
         shard_root_dir=opts.data,
         batch_size=opts.batch_size,
-        bucket_size=opts.bucket_size,
+        bucket_size=1,
         padding_idx=0,
         mode='valid',
         repeat=False)
