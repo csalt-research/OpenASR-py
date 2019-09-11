@@ -32,7 +32,7 @@ def beam_decode(model, vocab, src, lengths, opts, device):
         # Parameters
         beam_width = opts.beam_width
         topk = opts.nbest
-        SOS_token = vocab.encode('<sos>')
+        SOS_token = vocab.encode('<bos>')
         EOS_token = vocab.encode('<eos>')
 
         decoded_batch = []

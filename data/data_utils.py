@@ -29,6 +29,11 @@ class Vocab(object):
     def encode(self, token):
         return self.tok2idx.get(token, self.tok2idx['<unk>'])
 
+    def decode(self, token_id):
+        assert token_id < len(self.idx2tok), \
+            'token id must be less than %d, got %d' % (len(self.idx2tok), token_id)
+        return self.idx2tok[token_id]
+
 def split_corpus(path, shard_size):
     with open(path, "r") as f:
         if shard_size <= 0:

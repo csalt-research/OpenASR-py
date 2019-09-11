@@ -2,4 +2,4 @@
 
 # python3 train.py --share_dec_weights --brnn --data shards/cv3 --param_init_glorot --train_steps 50000 --valid_steps 3000 --optim adam --learning_rate 0.001 --save_dir saved/test --bridge_type mlp
 
-python3 train.py --share_dec_weights --brnn --data shards/cv3/us --param_init_glorot --train_steps 40000 --valid_steps 2000 --optim adam --learning_rate 0.001 --save_dir saved/us_only --bridge_type mlp
+python3 train.py --share_dec_weights --brnn --data shards/cv3/us --param_init_glorot --train_steps 40000 --valid_steps 3500 --optim adam --learning_rate 0.001 --save_dir saved/us_only --bridge_type mlp --batch_size 32

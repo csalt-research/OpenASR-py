@@ -48,8 +48,13 @@ def validate(valid_model, valid_dataloader, vocab, opts):
             target = target[target.ne(0)].cpu().numpy().tolist()
             utt, log_p = max(nbest, key=lambda x: x[1])
             # total_ed += min([edit_distance(x, target) for x, _ in nbest])
+            
+            # print('utterance', [vocab.decode(x) for x in utt])
+            # print('target', [vocab.decode(x) for x in target])
+            # print('*'*80)
+            
             total_ed += edit_distance(utt, target)
-            total_toks += tgt_len[j].item()
+            total_toks += tgt_len[j].item() - 1
             total_logp += log_p
 
     return -total_logp/total_toks, float(total_ed)/total_toks
@@ -153,7 +158,8 @@ def main(opts):
         # Perform BPTT
         bptt = False
         trunc_size = opts.bptt if opts.bptt > 0 else tgt.size(0)
-        normalization = src_len.sum().item()
+        normalization = (tgt_len - 1).sum().item()
+        # normalization = opts.batch_size
 
         for j in range(0, tgt.size(0)-1, trunc_size):
             # Find truncated target
