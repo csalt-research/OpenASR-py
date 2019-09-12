@@ -94,6 +94,10 @@ def preprocess_opts(parser):
               help="Path(s) to the validation source data")
     group.add('--tgt_valid', required=True, nargs='+',
               help="Path(s) to the validation target data")
+    group.add('--src_test', required=True, nargs='+',
+              help="Path(s) to the test source data")
+    group.add('--tgt_test', required=True, nargs='+',
+              help="Path(s) to the test target data")
     group.add('--src_dir', default="",
               help="Source directory for audio files.")
     group.add('--save_dir', required=True,

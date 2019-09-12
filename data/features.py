@@ -4,7 +4,7 @@ import math
 class AudioFeatureExtractor(object):
 	def __init__(self,
 				 sample_rate=16e3, 
-				 window_size=0.025, 
+				 window_size=0.02, 
 				 window_stride=0.01,
 				 window='hamming',
 				 feat_type='mfcc', 

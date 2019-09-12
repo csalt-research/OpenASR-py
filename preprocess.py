@@ -57,6 +57,20 @@ def preprocess(opts):
                      mode='valid', 
                      feats=feats)
 
+    # Build validation shards
+    for src_test, tgt_test in zip(opts.src_test, opts.tgt_test):
+        accent = src_test.split('/')[-2]
+        feats = {'accent': ACCENTS[accent], 'labeled': True}
+        build_shards(src_dir=opts.src_dir, 
+                     save_dir=os.path.join(opts.save_dir, accent), 
+                     src_file=src_test, 
+                     tgt_file=tgt_test,
+                     vocab=vocab,
+                     shard_size=opts.shard_size,
+                     feat_ext=feat_ext, 
+                     mode='test', 
+                     feats=feats)
+
 if __name__ == '__main__':
     parser = ArgumentParser(description='preprocess.py')
     parser = build_preprocess_parser(parser)
