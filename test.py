@@ -3,12 +3,9 @@ import torch
 from configargparse import ArgumentParser
 
 from data.dataloaders import ShardedDataLoader
-
 from utils.logging import logger
 from utils.opts import build_test_parser
-from utils.decode import beam_decode
-from utils.misc import edit_distance
-
+from translate.translator import Translator
 from models.ASR import ASRModel
 
 def evaluate(model, dataloader, vocab, opts):
@@ -19,7 +16,28 @@ def evaluate(model, dataloader, vocab, opts):
     model.eval()
     model.to(device)
 
-    
+    # Build translator
+    translator = Translator(
+        model,
+        dataloader,
+        vocab,
+        device,
+        n_best=opts.n_best,
+        min_length=opts.min_length,
+        max_length=opts.max_length,
+        ratio=opts.ratio,
+        beam_size=opts.beam_size,
+        block_ngram_repeat=opts.block_ngram_repeat,
+        ignore_when_blocking=set(opts.excluded_toks.split(',')),
+        out_file=opts.out,
+        verbose=opts.verbose
+    )
+    all_scores, all_preds = translator.translate()
+
+    # compute ER
+    avg_nll, avg_er = 0, 0
+
+    return avg_nll, avg_er
 
 def main(opts):
     # Load vocabulary and feature extractor
