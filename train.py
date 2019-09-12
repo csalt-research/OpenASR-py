@@ -9,10 +9,10 @@ from utils.logging import logger
 from utils.opts import build_train_parser
 from utils.loss import ShardedCELoss
 from utils.optimizers import Optimizer, build_torch_optimizer, make_lr_decay_fn
-from utils.misc import save_checkpoint, set_random_seed
+from utils.misc import save_checkpoint, set_random_seed, ensure_dir
 
 from models.ASR import ASRModel
-from .test import evaluate
+from test import evaluate
 
 def maybe_update_dropout(model, step):
     pass
@@ -176,8 +176,8 @@ def main(opts):
             logger.info(' * Avg. WER %.2f' % val_er['WER'])
             logger.info(' * Avg. CER %.2f' % val_er['CER'])
 
-            if best_val_er is None or val_er < best_val_er:
-                best_val_er = val_er
+            if best_val_er is None or val_er['WER'] < best_val_er:
+                best_val_er = val_er['WER']
                 p = save_checkpoint(opts.save_dir, step, model, optimizer, opts)
 
             if opts.tensorboard_dir:

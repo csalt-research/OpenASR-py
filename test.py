@@ -36,7 +36,7 @@ def evaluate(model, dataloader, vocab, opts):
 
     # Compute average NLL
     best_scores = [x[0] for x in all_scores]
-    avg_nll = sum(best_scores) / float(len(best_scores))
+    avg_nll = -sum(best_scores) / float(len(best_scores))
 
     # Compute average ERs
     total_ed = {'ER':0, 'WER':0, 'CER':0}
