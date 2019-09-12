@@ -2,4 +2,4 @@
 
 # CUDA_VISIBLE_DEVICES=0 python3 train.py --share_dec_weights --brnn --data shards/cv3 --param_init_glorot --train_steps 50000 --valid_steps 3000 --optim adam --learning_rate 0.001 --save_dir saved/test --bridge_type mlp
 
-CUDA_VISIBLE_DEVICES=0 python3 train.py --share_dec_weights --brnn --data shards/cv3/us --param_init_glorot --train_steps 40000 --valid_steps 3500 --optim adam --learning_rate 0.001 --save_dir saved/us_mlp_adam --bridge_type mlp --batch_size 32
+CUDA_VISIBLE_DEVICES=0 python3 train.py --share_dec_weights --brnn --data shards/cv3/us --param_init_glorot --train_steps 40000 --valid_steps 3500 --optim adam --learning_rate 0.001 --save_dir saved/us_mlp_adam --bridge_type mlp --batch_size 32 --train_from saved/us_mlp_adam/checkpoint.38501.pt

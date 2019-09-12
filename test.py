@@ -9,11 +9,11 @@ from translate.translator import Translator
 from models.ASR import ASRModel
 
 def evaluate(model, dataloader, vocab, opts):
-    # Identify device to run the model on
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # Set model in evaluation mode.
     model.eval()
+    model.sched_sampling_rate = 0.0
     model.to(device)
 
     # Build translator
@@ -32,10 +32,20 @@ def evaluate(model, dataloader, vocab, opts):
         out_file=opts.out,
         verbose=opts.verbose
     )
-    all_scores, all_preds = translator.translate()
+    all_scores, all_preds, all_ers = translator.translate()
 
-    # compute ER
-    avg_nll, avg_er = 0, 0
+    # Compute average NLL
+    best_scores = [x[0] for x in all_scores]
+    avg_nll = sum(best_scores) / float(len(best_scores))
+
+    # Compute average ERs
+    total_ed = {'ER':0, 'WER':0, 'CER':0}
+    total_cnt = {'ER':0, 'WER':0, 'CER':0}
+    for x in all_ers:
+        for k in x.keys():
+            total_ed[k] += x[k][0]
+            total_cnt[k] += x[k][1]
+    avg_er = {k: 100.*total_ed[k]/float(total_cnt[k]) for k in total_ed.keys()}
 
     return avg_nll, avg_er
 
@@ -62,7 +72,7 @@ def main(opts):
         batch_size=opts.batch_size,
         bucket_size=1,
         padding_idx=0,
-        mode=opts.split,
+        mode=opts.eval_split,
         repeat=False)
 
     # Load checkpoint from a saved previous training instance
@@ -78,7 +88,7 @@ def main(opts):
     logger.info('#Parameters: %d' % sum([p.nelement() for p in model.parameters()]))
 
     ################################################################################
-    logger.info('Evaluating performance on \'%d\' split' % opts.split)
+    logger.info('Evaluating performance on \'%s\' split' % opts.eval_split)
     test_loss, test_er = evaluate(model, test_dataloader, vocab, opts)
     logger.info('Avg. NLL %.4f, Avg. ER %.2f' % (test_loss, 100.0*test_er))
     ################################################################################
@@ -87,4 +97,5 @@ if __name__ == "__main__":
     parser = ArgumentParser(description='test.py')
     parser = build_test_parser(parser)
     opts = parser.parse_args()
+    set_random_seed(opts.seed)
     main(opts)

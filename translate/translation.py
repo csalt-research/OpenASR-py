@@ -1,4 +1,5 @@
 import torch
+from utils.misc import edit_distance
 
 class TranslationBuilder(object):
     def __init__(self, vocab, n_best):
@@ -6,11 +7,10 @@ class TranslationBuilder(object):
         self.n_best = n_best
 
     def _build_target_tokens(self, pred, attn):
-        EOS_id = self.vocab.encode('<eos>')
         tokens = []
         for tok in pred:
-            tokens.append(self.vocab.encode(tok))
-            if tokens[-1] == EOS_id:
+            tokens.append(self.vocab.decode(tok))
+            if tokens[-1] == '<eos>':
                 tokens = tokens[:-1]
                 break
         return tokens
@@ -18,9 +18,9 @@ class TranslationBuilder(object):
     def from_batch(self, translation_batch, tgt=None):
         batch_size = len(translation_batch["predictions"])
         preds, pred_score, attn, gold_score = \
-            translation_batch["predictions"],
-            translation_batch["scores"],
-            translation_batch["attention"],
+            translation_batch["predictions"], \
+            translation_batch["scores"], \
+            translation_batch["attention"], \
             translation_batch["gold_score"]
 
         translations = []
@@ -67,3 +67,30 @@ class Translation(object):
                 msg.append("[{:.4f}] {}\n".format(score, sent))
 
         return "".join(msg)
+
+    def error_rates(self):
+        result = {}
+        if self.gold_sent is not None:
+            # wordpiece error rate
+            s1 = self.gold_sent
+            s2 = self.pred_sents[0]
+            ed = edit_distance(s1, s2)
+            cnt = len(s1)
+            result['ER'] = (ed, cnt)
+            # word error rate
+            s1 = ''.join(self.gold_sent).split('\u2581')
+            s2 = ''.join(self.pred_sents[0]).split('\u2581')
+            ed = edit_distance(s1, s2)
+            cnt = len(s1)
+            result['WER'] = (ed, cnt)
+            # character error rate
+            s1 = list(''.join(self.gold_sent).replace('\u2581', ' '))
+            s1 = list(''.join(self.pred_sents[0]).replace('\u2581', ' '))
+            ed = edit_distance(s1, s2)
+            cnt = len(s1)
+            result['CER'] = (ed, cnt)
+        else:
+            result['ER'] = (0, 0)
+            result['WER'] = (0, 0)
+            result['CER'] = (0, 0)
+        return result

@@ -65,13 +65,11 @@ class RNNDecoder(nn.Module):
         input_feed = self.state["input_feed"].squeeze(0)
         input_feed_batch, _ = input_feed.size()
         
+        # decoding phase, one timestep at a time
         if tgt.dim() == 2:
-            decoding = True
-            tgt_batch = 1
             tgt = tgt.unsqueeze(0)
-        else:
-            t, tgt_batch, _ = tgt.size()
-            decoding = False
+        
+        tgt_batch = tgt.size(1)
 
         assert input_feed_batch == tgt_batch
 
@@ -88,8 +86,7 @@ class RNNDecoder(nn.Module):
         use_teacher_forcing = random.random() > self.sched_sampling_rate
 
         # Iterate over timesteps
-        max_time = tgt.size(0) if not decoding else 2
-        for t in range(1, max_time):
+        for t in range(tgt.size(0)):
             decoder_input = torch.cat([current_input, input_feed], 1)
             rnn_output, dec_state = self.rnn(decoder_input, dec_state)
 
@@ -115,8 +112,8 @@ class RNNDecoder(nn.Module):
             scores = self.generator(decoder_output)
             dec_outs += [scores]
 
-            if use_teacher_forcing and not decoding:
-                current_input = self.embeddings(tgt[t].unsqueeze(0)).squeeze(0)
+            if use_teacher_forcing and t+1 < tgt.size(0):
+                current_input = self.embeddings(tgt[t+1].unsqueeze(0)).squeeze(0)
             else:
                 _, idx = torch.max(scores, dim=1)
                 idx = idx.view(1, -1, 1)

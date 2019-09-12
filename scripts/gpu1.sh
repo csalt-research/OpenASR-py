@@ -2,4 +2,7 @@
 
 # CUDA_VISIBLE_DEVICES=1 python3 train.py --share_dec_weights --brnn --data shards/cv3 --param_init_glorot --train_steps 50000 --valid_steps 3000 --optim adam --learning_rate 0.001 --save_dir saved/test --bridge_type mlp
 
-CUDA_VISIBLE_DEVICES=1 python3 train.py --share_dec_weights --brnn --data shards/cv3/us --param_init_glorot --train_steps 40000 --valid_steps 3500 --optim sgd --learning_rate 1 --save_dir saved/us_mlp_sgd --bridge_type mlp --batch_size 32
+# CUDA_VISIBLE_DEVICES=1 python3 train.py --share_dec_weights --brnn --data shards/cv3/us --param_init_glorot --train_steps 40000 --valid_steps 3500 --optim adam --learning_rate 0.001 --save_dir saved/us_mlp_adam_new --bridge_type mlp --batch_size 32
+
+CUDA_VISIBLE_DEVICES=1 python3 train.py --brnn --data shards/cv3/us --param_init_glorot --train_steps 40000 --valid_steps 3500 --optim adam --learning_rate 0.001 --save_dir saved/us_original --bridge_type zero --batch_size 32 --enc_layers 4 --enc_rnn_size 512 --enc_dropout 0.5 --dec_layers 2 --dec_rnn_size 512 --dec_dropout 0.5 --embedding_size 500
+

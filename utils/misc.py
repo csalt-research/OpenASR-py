@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import os
+import numpy as np
+import random
 from .logging import logger
 
 class Elementwise(nn.ModuleList):
@@ -98,3 +100,13 @@ def tile(x, count, dim=0):
     if dim != 0:
         x = x.permute(perm).contiguous()
     return x
+
+def set_random_seed(seed):
+    """ 
+    Manually sets random seed across all libraries. 
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True

@@ -1,6 +1,4 @@
-""" Translator Class and builder """
 import codecs
-import os
 import time
 
 import torch
@@ -24,7 +22,8 @@ class Translator(object):
             block_ngram_repeat=0,
             ignore_when_blocking=frozenset(),
             out_file=None,
-            verbose=False):
+            verbose=False,
+            attn_debug=False):
         # model
         self.model = model
 
@@ -41,18 +40,13 @@ class Translator(object):
 
         # decoding parameters
         self.n_best = n_best
-        self.max_length = max_length
         self.beam_size = beam_size
-        self.random_sampling_temp = random_sampling_temp
-        self.sample_from_topk = random_sampling_topk
         self.min_length = min_length
+        self.max_length = max_length
         self.ratio = ratio
         self.block_ngram_repeat = block_ngram_repeat
         self.ignore_when_blocking = ignore_when_blocking
         self._exclusion_idxs = {vocab.encode(t) for t in ignore_when_blocking}
-        
-        # all models are assumed to be attentional
-        self.replace_unk = replace_unk
 
         # dataloader
         self.dataloader = dataloader
@@ -60,6 +54,7 @@ class Translator(object):
         # logging
         self.out_file = open(out_file if out_file else '/dev/null', 'w+')
         self.verbose = verbose
+        self.attn_debug = attn_debug
 
     def translate(self):
         xlation_builder = TranslationBuilder(self._tgt_vocab, self.n_best)
@@ -71,6 +66,7 @@ class Translator(object):
 
         all_scores = []
         all_predictions = []
+        all_error_rates = []
 
         start_time = time.time()
 
@@ -86,15 +82,15 @@ class Translator(object):
             # Translate batch
             batch_data = self.translate_batch(
                 src, src_len, tgt,
-                max_length,
+                max_length=self.max_length,
                 min_length=self.min_length,
                 ratio=self.ratio,
                 n_best=self.n_best,
-                return_attention=attn_debug
+                return_attention=self.attn_debug
             )
 
             # Process translations
-            translations = xlation_builder.from_batch(batch_data)
+            translations = xlation_builder.from_batch(batch_data, tgt)
             for trans in translations:
                 all_scores += [trans.pred_scores[:self.n_best]]
                 pred_score_total += trans.pred_scores[0]
@@ -105,7 +101,10 @@ class Translator(object):
 
                 n_best_preds = [" ".join(pred)
                                 for pred in trans.pred_sents[:self.n_best]]
+                
                 all_predictions += [n_best_preds]
+                all_error_rates += [trans.error_rates()]
+
                 self.out_file.write('\n'.join(n_best_preds) + '\n')
                 self.out_file.flush()
 
@@ -115,7 +114,7 @@ class Translator(object):
                     logger.info(output)
                     counter += 1
 
-                if attn_debug:
+                if self.attn_debug:
                     preds = trans.pred_sents[0]
                     preds.append('<eos>')
                     attns = trans.attns[0].tolist()
@@ -140,7 +139,7 @@ class Translator(object):
         logger.info("Average translation time (s): %f" % (total_time / len(all_predictions)))
         logger.info("Tokens per second: %f" % (pred_words_total / total_time))
 
-        return all_scores, all_predictions
+        return all_scores, all_predictions, all_error_rates
 
     def translate_batch(
             self,
@@ -156,8 +155,12 @@ class Translator(object):
             beam_size = self.beam_size
             batch_size = src.size(1)
 
-            # (1) Run the encoder on the src.
+            # (1) pt 1, Run the encoder on the src.
             enc_states, memory_bank, src_lengths = self.model.encoder(src, src_len)
+            # (1) pt 2, Convert encoder state to decoder state
+            enc_states = self.model.bridge(enc_states)
+            # (1) pt 3, Make size of memory bank same as that of decoder
+            memory_bank = self.model.W(memory_bank)
             self.model.decoder.init_state(enc_states)
 
             results = {
@@ -184,7 +187,7 @@ class Translator(object):
                 bos=self._tgt_bos_idx,
                 eos=self._tgt_eos_idx,
                 n_best=n_best,
-                mb_device=self._dev,
+                device=self._dev,
                 min_length=min_length,
                 max_length=max_length,
                 return_attention=return_attention,

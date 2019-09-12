@@ -8,56 +8,14 @@ from data.dataloaders import ShardedDataLoader
 from utils.logging import logger
 from utils.opts import build_train_parser
 from utils.loss import ShardedCELoss
-from utils.decode import beam_decode
 from utils.optimizers import Optimizer, build_torch_optimizer, make_lr_decay_fn
-from utils.misc import edit_distance, save_checkpoint
+from utils.misc import save_checkpoint, set_random_seed
 
 from models.ASR import ASRModel
+from .test import evaluate
 
 def maybe_update_dropout(model, step):
     pass
-
-def validate(valid_model, valid_dataloader, vocab, opts):
-    # Identify device to run the model on
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-    # Set model in validating mode.
-    valid_model.eval()
-    valid_model.to(device)
-
-    # Initialize statistics
-    total_ed = 0
-    total_toks = 0
-    total_logp = 0.0
-
-    # Enumerate over batch
-    for i, batch in enumerate(valid_dataloader):
-        src, src_len, tgt, tgt_len, feat = batch
-
-        # Copy to device
-        src = src.to(device)
-        src_len = src_len.to(device)
-
-        # Beam-search decode
-        utterances = beam_decode(valid_model, vocab, src, src_len, opts, device)
-
-        # Compute statistics
-        for j in range(src.size(1)):
-            nbest = utterances[j]
-            target = tgt[:, j]
-            target = target[target.ne(0)].cpu().numpy().tolist()
-            utt, log_p = max(nbest, key=lambda x: x[1])
-            # total_ed += min([edit_distance(x, target) for x, _ in nbest])
-            
-            # print('utterance', [vocab.decode(x) for x in utt])
-            # print('target', [vocab.decode(x) for x in target])
-            # print('*'*80)
-            
-            total_ed += edit_distance(utt, target)
-            total_toks += tgt_len[j].item() - 1
-            total_logp += log_p
-
-    return -total_logp/total_toks, float(total_ed)/total_toks
 
 def main(opts):
     # Load vocabulary and feature extractor
@@ -78,7 +36,7 @@ def main(opts):
     # Build data loader(s)
     train_dataloader = ShardedDataLoader(
         shard_root_dir=opts.data,
-        batch_size=opts.batch_size,
+        batch_size=opts.train_batch_size,
         bucket_size=opts.bucket_size,
         padding_idx=0,
         mode='train',
@@ -86,7 +44,7 @@ def main(opts):
 
     valid_dataloader = ShardedDataLoader(
         shard_root_dir=opts.data,
-        batch_size=opts.batch_size,
+        batch_size=opts.eval_batch_size,
         bucket_size=1,
         padding_idx=0,
         mode='valid',
@@ -95,11 +53,17 @@ def main(opts):
     # Define objective
     criterion = ShardedCELoss()
 
+    # TensorboardX writer
+    if opts.tensorboard_dir:
+        ensure_dir(opts.tensorboard_dir)
+        from tensorboardX import SummaryWriter
+        tb_writer = SummaryWriter(opts.tensorboard_dir)
+
     # Build model
-    if opts.train_from and os.path.exists(opts.train_from):
+    if opts.checkpoint and os.path.exists(opts.checkpoint):
         # Load checkpoint if we resume from a previous training
-        logger.info('Loading checkpoint from %s' % opts.train_from)
-        checkpoint = torch.load(opts.train_from, \
+        logger.info('Loading checkpoint from %s' % opts.checkpoint)
+        checkpoint = torch.load(opts.checkpoint, \
             map_location=lambda storage, loc: storage)
         ckpt_opts = checkpoint['opts']
 
@@ -159,11 +123,12 @@ def main(opts):
         bptt = False
         trunc_size = opts.bptt if opts.bptt > 0 else tgt.size(0)
         normalization = (tgt_len - 1).sum().item()
-        # normalization = opts.batch_size
+        # normalization = opts.train_batch_size
 
-        for j in range(0, tgt.size(0)-1, trunc_size):
+        tgt_in = tgt[:-1]
+        for j in range(0, tgt_in.size(0), trunc_size):
             # Find truncated target
-            tgt_trunc = tgt[j : j+trunc_size]
+            tgt_trunc = tgt_in[j : j+trunc_size]
             # Clear accumulated gradients
             optimizer.zero_grad()
             # F-prop model
@@ -189,29 +154,47 @@ def main(opts):
             train_loss += loss.item()
 
         # Print status
-        if i>0 and i % opts.print_every == 0:
-            logger.info(' * Batches %d/%d Avg. NLL %.4f Time %.2f' % \
-                (i, opts.train_steps, train_loss/opts.print_every, time.time()-start_time))
+        if i>0 and i % opts.log_every == 0:
+            avg_nll = train_loss/opts.log_every
+            avg_time = (time.time() - start_time)/opts.log_every
+            logger.info(' * Batches %d/%d Avg. NLL %.4f Time %.2fs/batch' % \
+                (i, opts.train_steps, avg_nll, avg_time))
+
+            if opts.tensorboard_dir:
+                tb_writer.add_scalar('train/nll', avg_nll, i)
+                tb_writer.add_scalar('train/time', avg_time, i)
+            
             train_loss = 0.0
             start_time = time.time()
 
         # Validation
-        if i>0 and i % opts.valid_steps == 0:
+        if i>0 and i % opts.eval_steps == 0:
             logger.info('Validating performance')
-            val_loss, val_er = validate(model, valid_dataloader, vocab, opts)
-            logger.info(' * Avg. NLL %.4f, Avg. ER %.2f' % (val_loss, 100.0*val_er))
+            val_loss, val_er = evaluate(model, valid_dataloader, vocab, opts)
+            logger.info(' * Avg. NLL %.4f' % val_loss)
+            logger.info(' * Avg. ER %.2f' % val_er['ER'])
+            logger.info(' * Avg. WER %.2f' % val_er['WER'])
+            logger.info(' * Avg. CER %.2f' % val_er['CER'])
 
             if best_val_er is None or val_er < best_val_er:
                 best_val_er = val_er
                 p = save_checkpoint(opts.save_dir, step, model, optimizer, opts)
 
+            if opts.tensorboard_dir:
+                tb_writer.add_scalar('val/nll', val_loss, i)
+                tb_writer.add_scalar('val/wer', val_er['WER'], i)
+                tb_writer.add_scalar('val/cer', val_er['CER'], i)
+                tb_writer.add_scalar('val/er', val_er['ER'], i)
+
+            start_time = time.time()
+
         # Termination condition
         if not opts.single_pass and i >= opts.train_steps:
             break
-
 
 if __name__ == "__main__":
     parser = ArgumentParser(description='train.py')
     parser = build_train_parser(parser)
     opts = parser.parse_args()
+    set_random_seed(opts.seed)
     main(opts)
