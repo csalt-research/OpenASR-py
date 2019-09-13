@@ -125,13 +125,18 @@ class Optimizer(object):
             'optimizer': self._optimizer.state_dict()
         }
 
-    def load_state_dict(self, state_dict):
+    def load_state_dict(self, state_dict, device):
         self._training_step = state_dict['training_step']
         # State can be partially restored
         if 'decay_step' in state_dict:
             self._decay_step = state_dict['decay_step']
         if 'optimizer' in state_dict:
             self._optimizer.load_state_dict(state_dict['optimizer'])
+            # https://github.com/pytorch/pytorch/issues/2830
+            for state in self._optimizer.state.values():
+                for k, v in state.items():
+                    if torch.is_tensor(v):
+                        state[k] = v.to(device)
 
     def zero_grad(self):
         self._optimizer.zero_grad()

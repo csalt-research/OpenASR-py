@@ -76,7 +76,7 @@ def main(opts):
             learning_rate=ckpt_opts.learning_rate,
             learning_rate_decay_fn=make_lr_decay_fn(ckpt_opts),
             max_grad_norm=ckpt_opts.max_grad_norm)
-        optimizer.load_state_dict(checkpoint['optim'])
+        optimizer.load_state_dict(checkpoint['optim'], device)
 
     else:
         logger.info('Building model')

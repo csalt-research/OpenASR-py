@@ -53,14 +53,12 @@ class Translation(object):
         msg = []
         best_pred = self.pred_sents[0]
         best_score = self.pred_scores[0]
-        pred_sent = ' '.join(best_pred)
-        msg.append('PRED {}: {}\n'.format(sent_number, pred_sent))
-        msg.append("PRED SCORE: {:.4f}\n".format(best_score))
+        pred_sent = ''.join(best_pred).replace('\u2581', ' ')
+        msg.append('\nPRED {}: [{:.4f}] {}\n'.format(sent_number, best_score, pred_sent))
 
         if self.gold_sent is not None:
-            tgt_sent = ' '.join(self.gold_sent)
-            msg.append('GOLD {}: {}\n'.format(sent_number, tgt_sent))
-            msg.append(("GOLD SCORE: {:.4f}\n".format(self.gold_score)))
+            tgt_sent = ''.join(self.gold_sent).replace('\u2581', ' ')
+            msg.append('GOLD {}: [{:.4f}] {}\n'.format(sent_number, self.gold_score, tgt_sent))
         if len(self.pred_sents) > 1:
             msg.append('\nBEST HYP:\n')
             for score, sent in zip(self.pred_scores, self.pred_sents):

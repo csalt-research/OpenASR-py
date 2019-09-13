@@ -67,7 +67,10 @@ def _worker(args):
     src, tgt, feat_ext, vocab = args
     if tgt == '':
         return None
-    return feat_ext(src), tgt, [vocab.encode(x) for x in ('<bos> '+tgt+' <eos>').split()]
+    try:
+        return feat_ext(src), tgt, [vocab.encode(x) for x in ('<bos> '+tgt+' <eos>').split()]
+    except Exception as e:
+        return None
 
 def build_shards(src_dir, save_dir, src_file, tgt_file, vocab,
                  shard_size, feat_ext, mode='train', feats=None

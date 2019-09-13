@@ -1,5 +1,6 @@
 import librosa
 import math
+import numpy as np
 
 class AudioFeatureExtractor(object):
 	def __init__(self,

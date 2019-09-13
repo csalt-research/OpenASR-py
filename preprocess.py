@@ -57,7 +57,7 @@ def preprocess(opts):
                      mode='valid', 
                      feats=feats)
 
-    # Build validation shards
+    # Build test shards
     for src_test, tgt_test in zip(opts.src_test, opts.tgt_test):
         accent = src_test.split('/')[-2]
         feats = {'accent': ACCENTS[accent], 'labeled': True}

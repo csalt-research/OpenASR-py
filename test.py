@@ -5,6 +5,7 @@ from configargparse import ArgumentParser
 from data.dataloaders import ShardedDataLoader
 from utils.logging import logger
 from utils.opts import build_test_parser
+from utils.misc import set_random_seed
 from translate.translator import Translator
 from models.ASR import ASRModel
 
@@ -69,7 +70,7 @@ def main(opts):
     # Build data loader
     test_dataloader = ShardedDataLoader(
         shard_root_dir=opts.data,
-        batch_size=opts.batch_size,
+        batch_size=opts.eval_batch_size,
         bucket_size=1,
         padding_idx=0,
         mode=opts.eval_split,
@@ -90,7 +91,10 @@ def main(opts):
     ################################################################################
     logger.info('Evaluating performance on \'%s\' split' % opts.eval_split)
     test_loss, test_er = evaluate(model, test_dataloader, vocab, opts)
-    logger.info('Avg. NLL %.4f, Avg. ER %.2f' % (test_loss, 100.0*test_er))
+    logger.info(' * Avg. NLL %.4f' % test_loss)
+    logger.info(' * Avg. ER %.2f' % test_er['ER'])
+    logger.info(' * Avg. WER %.2f' % test_er['WER'])
+    logger.info(' * Avg. CER %.2f' % test_er['CER'])
     ################################################################################
 
 if __name__ == "__main__":
