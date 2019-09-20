@@ -1,0 +1,14 @@
+# Ignore temporary python files / dirs
+*.pyc
+__pycache__
+*.pt
+*.mp3
+runs/
+out/
+data/*
+saved/
+logs/
+
+# Ignore user-generated exp directories
+exp
+.DS_Store
