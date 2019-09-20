@@ -83,7 +83,7 @@ class Translation(object):
             result['WER'] = (ed, cnt)
             # character error rate
             s1 = list(''.join(self.gold_sent).replace('\u2581', ' '))
-            s1 = list(''.join(self.pred_sents[0]).replace('\u2581', ' '))
+            s2 = list(''.join(self.pred_sents[0]).replace('\u2581', ' '))
             ed = edit_distance(s1, s2)
             cnt = len(s1)
             result['CER'] = (ed, cnt)
