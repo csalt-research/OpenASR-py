@@ -2,7 +2,7 @@
 
 ## Contents
 1. [Data preparation](#data-preparation)
-2. [Data preprocessing](#data-processing)
+2. [Data preprocessing](#data-preprocessing)
 3. [Training](#training)
 4. [Evaluation](#evaluation)
 5. [Performance](#performance)
