@@ -1,79 +1,58 @@
-# Active Adversarial Accent Adaptation in ASR
+# OpenASR-py
 
-This repository contains the codebase for my BTP on 'Active Adversarial Accent Adaptation in ASR' under the supervision of Prof. Preethi Jyothi (IIT Bombay) and Dr. Maneesh Singh (Director, Verisk AI), and mentorship of Deepak Mittal (Verisk AI). It is based on OpenNMT-py.
+OpenASR-py is a minimal, [PyTorch](https://github.com/pytorch/pytorch) based open source toolkit for end-to-end automatic speech recognition (ASR) related tasks, which borrows many elements from [OpenNMT-py](https://github.com/OpenNMT/OpenNMT-py) and at the same time provides simpler, task-specific reimplementations of several others. Due to the highly modular and transparent codebase, it can be used as a starting point for research projects in ASR as well as other less explored topics such as domain adaptation, adversarial training, active learning etc.
+
+### Key features
+* Blazingly fast, just like OpenNMT-py (details [here](https://github.com/OpenNMT/OpenNMT-py/issues/552))
+* Highly modular and easily extensible codebase
+* Provision of basic routine(s) for ASR
+* Audio-specific feature extraction and data preprocessing
+* Simple and transparent data loading pipeline
+* Implementations of a variety of encoders, decoders and attention mechanisms
+* Support for word-, character- and wordpiece-level output granularity
+* Beam-search decoding and error rate computation during evaluation
+* Logging support using Tensorboard
+* Model checkpointing and resumable training
+
+## Contents
+1. [Installation](#installation)
+2. [Overview](#overview)
+3. [Pipelines](#pipelines)
+4. [Acknowledgements](#acknowledgements)
+5. [Contributing](#contributing)
 
 ## Installation
 
-We recommend using `conda` for setting up the environment. After `miniconda` has been successfully installed, follow the steps below:
-
-*Note*: `conda` gives an intermittent `HTTP 000 Connection Error`. Retrying the command, several times at worst, solves the issue.
+We recommend using `conda` for setting up the environment. After it has been successfully installed, follow the steps below:
 ```bash
-# create environment
-conda create -n aa
-conda activate aa
-# install pytorch 1.1 and its dependencies
-conda install pytorch=1.1 -c pytorch
-# clone codebase and install its dependencies
-git clone https://github.com/ys1998/accent-adaptation.git
-cd accent-adaptation/
+# Create environment
+conda create -n oasr
+conda activate oasr
+# Install pytorch 1.1 and its dependencies
+# NOTE: This command gives an intermittent 'HTTP 000 Connection Error'. 
+# Retrying it, several times at worst, solves the issue.
+conda install pytorch cudatoolkit=10.0 -c pytorch
+# Clone codebase and install its dependencies
+git clone https://github.com/csalt-research/OpenASR-py.git
+cd OpenASR-py/
 pip install -r requirements.txt
-# install torchaudio
-pip install librosa
-sudo apt-get install -y sox libsox-dev libsox-fmt-all
-pip install git+https://github.com/pytorch/audio@d92de5b
-# install sentencepiece
-pip install sentencepiece
-# install library for error rate computation
-pip install python-levenshtein
 ```
 
-## Generating train/val/test splits
+## Overview
 
 TODO
 
-## Preprocessing and preparing data
+## Pipelines
 
-Perform these steps to filter and preprocess the data.
-```bash
-# remove long utterances that often cause OoM
-python filter_data.py
-# train a sentencepiece model and use it to encode transcripts
-python convert_to_sp.py
-# read mp3 files, compute features, sharding and saving as .pt files
-python preprocess.py -data_type audio -src_dir <PATH TO DATA DIR> -train_src <PATH TO SRC TRAIN FILE> -train_tgt <PATH TO TGT TRAIN FILE> -valid_src <PATH TO SRC VALID FILE> -valid_tgt <PATH TO TGT VALID FILE> -save_data <PATH TO SAVE DIR> --src_seq_length <MAX SRC SEQ LEN> --tgt_seq_length <MAX TGT SEQ LEN> -sample_rate <SAMPLE RATE> -shard_size <SHARD SIZE> [--overwrite]
-```
+We provide functional code for the following tasks. You can find more details in the corresponding README files.
 
-## Training
-In order to train the baseline ASR model, use this command
-```bash
-python train.py -model_type audio \
-  	-rnn_type LSTM \
-  	-encoder_type brnn \
-  	-enc_rnn_size 1024 \
-  	-enc_layers 4 \
-  	-audio_enc_pooling 2 \
-  	-dec_rnn_size 512 \
-  	-dec_layers 1 \
-  	-dropout 0.5 \
-  	-data <PATH WHERE SHARDS ARE STORED> \
-  	-save_model <PATH TO SAVE DIR> \
-	-global_attention mlp \
-  	-batch_size 32 \
-  	-optim adam \
-  	-max_grad_norm 100 \
-  	-learning_rate 0.0003 \
-  	-learning_rate_decay 0.8 \
-  	-train_steps 40000 \
-  	-valid_steps 1000 \
-  	-save_checkpoint_steps 2000 \
-  	-keep_checkpoint 3 \
-  	-tensorboard \
-  	-tensorboard_log_dir <PATH TO LOG DIR> \
-  	-gpu_ranks 0 \
- 	-sample_rate 48000
-```
+1. [**Automatic Speech Recognition (ASR)**](pipelines/ASR): obtain the transcription for a given utterance
+2. [**Domain Adversarial Training (DAT)**](): TODO
+3. [**Active Learning (AL)**](): TODO
+4. [**Active Adversarial Domain Adaptation (AADA)**](): TODO
 
-## Computing ERs
-```bash
-bash compute_er.sh
-```
+## Acknowledgements
+OpenASR-py was originally developed by [Yash Shah](https://ys1998.github.io) ([ys1998](https://github.com/ys1998)); it started off as an initiative to make certain relatively complicated and opaque aspects of OpenNMT-py more ASR-specific and research friendly during his undergraduate thesis project at IIT Bombay under the supervision of Prof. Preethi Jyothi.
+
+## Contributing
+Feel free to report any bug, request a feature or ask a general question in the [Issues](https://github.com/csalt-research/OpenASR-py/issues) tab. We also love contributions, for which you can consult the same section for appropriately tagged posts. 
