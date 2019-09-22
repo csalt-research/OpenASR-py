@@ -2,6 +2,9 @@
 
 OpenASR-py is a minimal, [PyTorch](https://github.com/pytorch/pytorch) based open source toolkit for end-to-end automatic speech recognition (ASR) related tasks, which borrows many elements from [OpenNMT-py](https://github.com/OpenNMT/OpenNMT-py) and at the same time provides simpler, task-specific reimplementations of several others. 
 
+![Attention-based encoder-decoder model for ASR](asr-erd.jpg)
+*Source: https://www.clsp.jhu.edu/workshops/18-workshop/multilingual-end-end-asr-incomplete-data/*
+
 Due to the highly modular and transparent codebase, it can be used as a starting point for research projects in ASR as well as other less explored topics such as domain adaptation, adversarial training, active learning etc.
 
 ### Key features
