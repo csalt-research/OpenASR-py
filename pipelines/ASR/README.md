@@ -1,10 +1,11 @@
 # Automatic Speech Recognition
 
 ## Contents
-1. Data preparation
-2. Data preprocessing
-3. Training
-4. Evaluation
+1. [Data preparation](#data-preparation)
+2. [Data preprocessing](#data-processing)
+3. [Training](#training)
+4. [Evaluation](#evaluation)
+5. [Performance](#performance)
 
 ## Data preparation
 
@@ -57,3 +58,7 @@ python train.py -model_type audio \
 ```bash
 bash compute_er.sh
 ```
+
+## Performance
+
+TODO
