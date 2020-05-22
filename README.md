@@ -57,7 +57,7 @@ We provide functional code for the following tasks. You can find more details in
 4. **Active Adversarial Domain Adaptation (AADA)**: TODO
 
 ## Acknowledgements
-OpenASR-py was originally developed by [Yash Shah](https://ys1998.github.io) ([ys1998](https://github.com/ys1998)); it started off as an initiative to make certain relatively complicated and opaque aspects of OpenNMT-py more ASR-specific and research friendly during his undergraduate thesis project at IIT Bombay under the supervision of Prof. Preethi Jyothi.
+OpenASR-py was originally developed by [Yash Shah](https://ys1998.github.io) ([ys1998](https://github.com/ys1998)) using the [OpenNMT-py](https://github.com/OpenNMT/OpenNMT-py) framework as a starting point; it was initiated with the objective of making certain relatively complicated and opaque aspects of OpenNMT-py more ASR-specific and research friendly during his undergraduate thesis project at IIT Bombay under the supervision of Prof. Preethi Jyothi.
 
 ## Contributing
 Feel free to report any bug, request a feature or ask a general question in the [Issues](https://github.com/csalt-research/OpenASR-py/issues) tab. We also love contributions, for which you can consult the same section for appropriately tagged posts. 
